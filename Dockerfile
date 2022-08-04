@@ -2,7 +2,7 @@ FROM python:3.7-slim-bullseye
 LABEL maintainer="@satake"
 
 #
-# install application
+# install packages
 #
 RUN apt update && apt install -y \
     build-essential \
@@ -16,18 +16,25 @@ RUN apt update && apt install -y \
     git && \
     rm -rf /var/lib/apt/lists/*
 
-# RUN pip install tensorflow-directml
+#
+# install & setup megenta
+#
 RUN pip install magenta
 RUN git clone https://github.com/tensorflow/magenta.git /opt/magenta && \
     cd /opt/magenta && \
     pip install -e .
-RUN curl https://storage.googleapis.com/magentadata/models/onsets_frames_transcription/maestro_checkpoint.zip > /opt/maestro_checkpoint.zip && \
-    cd /opt && \
-    unzip /opt/maestro_checkpoint.zip
 
-WORKDIR /opt/magenta
-RUN echo "#!/usr/bin/env bash" > /magenta.sh && \
-    echo 'python magenta/models/onsets_frames_transcription/onsets_frames_transcription_transcribe.py --model_dir="/opt/train" /opt/wav/$1' >> /magenta.sh && \
+#
+# setup magenta.sh
+#
+RUN echo '#!/usr/bin/env bash' > /magenta.sh && \
+    echo 'if [ -d /opt/of ] && [ ! -f /opt/of/train/checkpoint ]; then' >> /magenta.sh && \
+    echo 'curl https://storage.googleapis.com/magentadata/models/onsets_frames_transcription/maestro_checkpoint.zip > /opt/of/maestro_checkpoint.zip' >> /magenta.sh && \
+    echo 'cd /opt/of && unzip /opt/of/maestro_checkpoint.zip' >> /magenta.sh && \
+    echo 'fi' >> /magenta.sh && \
+    echo 'cd /opt/magenta' >> /magenta.sh && \
+    echo 'python magenta/models/onsets_frames_transcription/onsets_frames_transcription_transcribe.py --model_dir="/opt/of/train" /opt/of/wav/$1' >> /magenta.sh && \
     chmod +x /magenta.sh
+
 ENTRYPOINT [ "/magenta.sh" ]
 CMD ["magenta.wav"]
